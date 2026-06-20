@@ -5,55 +5,105 @@ from bs4 import BeautifulSoup
 
 WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
 
-def get_real_blox_fruits_stock():
+def get_stock():
     try:
-        # ブロフル公式Wikiのストックページからデータを取得
-        url = "https://fandom.com"
-        headers = {"User-Agent": "Mozilla/5.0"}
-        response = requests.get(url, headers=headers, timeout=10)
-        
-        if response.status_code == 200:
-            soup = BeautifulSoup(response.text, 'html.parser')
-            
-            # Wikiのページ内から「Current Stock（現在の在庫）」のテーブルを探す
-            # ページ構造から果物の名前が入っている要素を抽出します
-            fruits = []
-            # 現在のストックが表示されているテーブルの枠を探す（一般的なFandomの構成）
-            stock_table = soup.find('table', {'class': 'article-table'})
-            if stock_table:
-                rows = stock_table.find_all('tr')
-                for row in rows[1:]: # 見出しを飛ばす
-                    cols = row.find_all('td')
-                    if cols:
-                        fruit_name = cols[0].text.strip()
-                        fruits.append(fruit_name)
-            
-            if fruits:
-                return fruits
-                
+        url = "https://blox-fruits.fandom.com/wiki/Blox_Fruits_Wiki"
+
+        headers = {
+            "User-Agent": "Mozilla/5.0"
+        }
+
+        response = requests.get(
+            url,
+            headers=headers,
+            timeout=10
+        )
+
+        response.raise_for_status()
+
+        soup = BeautifulSoup(
+            response.text,
+            "html.parser"
+        )
+
+        fruits=[]
+
+        # Wikiページ全体から果物名候補を探す
+        fruit_names = [
+            "Rocket",
+            "Spin",
+            "Chop",
+            "Spring",
+            "Bomb",
+            "Smoke",
+            "Spike",
+            "Flame",
+            "Falcon",
+            "Ice",
+            "Sand",
+            "Dark",
+            "Diamond",
+            "Light",
+            "Rubber",
+            "Ghost",
+            "Magma",
+            "Quake",
+            "Buddha",
+            "Love",
+            "Spider",
+            "Sound",
+            "Phoenix",
+            "Portal",
+            "Rumble",
+            "Pain",
+            "Blizzard",
+            "Gravity",
+            "Mammoth",
+            "T-Rex",
+            "Dough",
+            "Shadow",
+            "Venom",
+            "Control",
+            "Spirit",
+            "Dragon",
+            "Leopard",
+            "Kitsune"
+        ]
+
+        page_text=soup.get_text()
+
+        for fruit in fruit_names:
+            if fruit in page_text:
+                fruits.append(fruit)
+
+        return fruits
+
     except Exception as e:
-        print(f"Wikiからのデータ取得に失敗しました: {e}")
-        
-    return ["データの自動取得に失敗しました。Wikiのページ構成が変わった可能性があります。"]
+        print(e)
+        return []
 
 def send_discord(stock_list):
-    if not WEBHOOK_URL:
-        print("エラー: DiscordのウェブフックURLが未設定です")
+
+    if not stock_list:
+        print("在庫取得失敗")
         return
-        
-    stock_text = "\n".join([f"• {fruit}" for fruit in stock_list])
-    
+
     payload = {
-        "username": "ブロフル入荷Bot",
-        "embeds": [{
-            "title": "🏪 現在のフルーツディーラーリアルタイム在庫",
-            "description": f"【現在の公式ラインナップ】\n\n{stock_text}\n\n※4時間ごとにWikiから最新情報を自動取得中",
-            "color": 16753920
+        "username":"ブロフル入荷Bot",
+        "embeds":[{
+            "title":"🏪 フルーツディーラー在庫",
+            "description":"\n".join(
+                [f"• {fruit}" for fruit in stock_list]
+            ),
+            "color":16753920
         }]
     }
-    
-    requests.post(WEBHOOK_URL, data=json.dumps(payload), headers={"Content-Type": "application/json"})
 
-if __name__ == "__main__":
-    fruits = get_real_blox_fruits_stock()
-    send_discord(fruits)
+    requests.post(
+        WEBHOOK_URL,
+        json=payload
+    )
+
+if __name__=="__main__":
+    stock=get_stock()
+    send_discord(stock)
