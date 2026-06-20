@@ -73,68 +73,104 @@ def get_stock(max_retries=3, retry_delay=5):
     return None
 
 
-FRUIT_IMAGE_BASE = "https://fruityblox.com/images/fruits/"
+# フルーツ名(小文字スラッグ) → カスタム絵文字 の対応表
+# 絵文字が登録されていないフルーツは、自動でテキストのみの表示になる
+FRUIT_EMOJIS = {
+    "rocket": "<:rocket:1517892353023541319>",
+    "spin": "<:spin:1517892327321108640>",
+    "blade": "<:blade:1517892297524510851>",
+    "spring": "<:spring:1517892266587455558>",
+    "bomb": "<:bomb:1517892227513323570>",
+    "smoke": "<:smoke:1517892174081953882>",
+    "spike": "<:spike:1517892145955078266>",
+    "flame": "<:Flame:1517892093123760328>",
+    "dark": "<:dark:1517891982087946310>",
+    "sand": "<:sand:1517891871920226516>",
+    "ice": "<:ICE:1517891849950331030>",
+    "rubber": "<:rubber:1517891823945650237>",
+    "ghost": "<:Ghost:1517891777288343733>",
+    "eagle": "<:Falcon:1517891710921736482>",
+    "light": "<:Light:1517896780019404948>",
+    "quake": "<:Quake:1517896834754940969>",
+    "diamond": "<:diamond:1517891345602183392>",
+    "magma": "<:magma:1517891248357380098>",
+    "love": "<:Love:1517891188751859842>",
+    "spider": "<:spider:1517891167696719892>",
+    "sound": "<:sound:1517891139942744184>",
+    "phoenix": "<:__:1517891089837588714>",
+    "blizzard": "<:Blizzard:1517891040873283584>",
+    "shadow": "<:SHADOW:1517891015749664788>",
+    "mammoth": "<:mammoth:1517890988087971992>",
+    "portal": "<:Portal:1517890967464575077>",
+    "buddha": "<:Baddha:1517890833330995401>",
+    "spirit": "<:Spirit:1517890810769707009>",
+    "control": "<:control:1517890776149922102>",
+    "venom": "<:venom:1517890755387986122>",
+    "gravity": "<:Gravity:1517890734257344542>",
+    "pain": "<:pain:1517890712887234641>",
+    "t-rex": "<:TLEX:1517890689285886172>",
+    "dough": "<:Dough:1517890671002779841>",
+    "rumble": "<:Rumble:1517890636332793994>",
+    "tiger": "<:tiger:1517890600878211215>",
+    "gas": "<:GAS:1517890586517045280>",
+    "yeti": "<:Yeti:1517890567328108554>",
+    "kitsune": "<:kitsune:1517890548482965735>",
+    "dragon-east": "<:DragonEast:1517890531823456316>",
+    "dragon-west": "<:DragonWest:1517890511367700510>",
+}
+
+
+def fruit_display(fruit, use_emoji=False):
+    """use_emoji=Trueなら絵文字付き、Falseならテキストのみで表示用文字列を作る"""
+    if use_emoji:
+        emoji = FRUIT_EMOJIS.get(fruit["slug"], "")
+        if emoji:
+            return f"{emoji} {fruit['name']}"
+    return f"• {fruit['name']}"
+
+
+def build_payload(stock_data, use_emoji=False):
+    now_unix = int(datetime.now(timezone.utc).timestamp())
+    timestamp_text = f"<t:{now_unix}:R>"
+
+    normal_text = "\n".join([fruit_display(f, use_emoji) for f in stock_data["normal"]]) or "（取得できませんでした）"
+    mirage_text = "\n".join([fruit_display(f, use_emoji) for f in stock_data["mirage"]]) or "（取得できませんでした）"
+
+    description = (
+        "**ノーマルフルーツディーラー**" + "\n" + normal_text + "\n\n" +
+        "**ミラージュフルーツディーラー**" + "\n" + mirage_text + "\n\n" +
+        timestamp_text
+    )
+
+    return {
+        "username": "ブロフル入荷Bot",
+        "embeds": [{
+            "title": "🏪 フルーツディーラー在庫",
+            "description": description,
+            "color": 16753920
+        }]
+    }
 
 
 def send_discord(stock_data):
-    # 設定されているWebhook URLをすべて集める（未設定のものは除く）
-    webhook_urls = [url for url in [WEBHOOK_URL, WEBHOOK_URL_2] if url]
-
-    if not webhook_urls:
+    if not WEBHOOK_URL and not WEBHOOK_URL_2:
         print("警告: DISCORD_WEBHOOK_URL が設定されていません。GitHubのSecretsを確認してください。")
         return
     if not stock_data or (not stock_data["normal"] and not stock_data["mirage"]):
         print("在庫取得失敗、または在庫が空です")
         return
 
-    # Discordの相対時刻表示（例: "数秒前"）用のUnixタイムスタンプ
-    now_unix = int(datetime.now(timezone.utc).timestamp())
-    timestamp_text = f"<t:{now_unix}:R>"
+    # 1つ目のWebhook: テキストのみ（絵文字なし）
+    if WEBHOOK_URL:
+        payload = build_payload(stock_data, use_emoji=False)
+        res = requests.post(WEBHOOK_URL, json=payload)
+        print(f"Discord送信ステータス (Webhook 1, テキストのみ): {res.status_code}")
 
-    embeds = []
-
-    # 見出し用の最初の埋め込み（オレンジ色）
-    embeds.append({
-        "title": "🏪 フルーツディーラー在庫",
-        "description": "**ノーマルフルーツディーラー**" + "\n" + timestamp_text,
-        "color": 16753920
-    })
-
-    # ノーマル在庫: フルーツごとに画像付き埋め込み
-    for fruit in stock_data["normal"]:
-        embeds.append({
-            "description": "• " + fruit["name"],
-            "color": 16753920,
-            "thumbnail": {"url": FRUIT_IMAGE_BASE + fruit["slug"] + ".webp"}
-        })
-
-    # ミラージュ見出し
-    embeds.append({
-        "description": "**ミラージュフルーツディーラー**",
-        "color": 10181046
-    })
-
-    # ミラージュ在庫: フルーツごとに画像付き埋め込み
-    for fruit in stock_data["mirage"]:
-        embeds.append({
-            "description": "• " + fruit["name"],
-            "color": 10181046,
-            "thumbnail": {"url": FRUIT_IMAGE_BASE + fruit["slug"] + ".webp"}
-        })
-
-    # Discordは1メッセージにつきembed最大10個まで。超える場合は分割して送信する
-    chunk_size = 10
-
-    # 設定されている全てのWebhook URL（=全サーバー）に同じ内容を送る
-    for webhook_url in webhook_urls:
-        for i in range(0, len(embeds), chunk_size):
-            chunk = embeds[i:i + chunk_size]
-            payload = {
-                "username": "ブロフル入荷Bot",
-                "embeds": chunk
-            }
-            res = requests.post(webhook_url, json=payload)
-            print(f"Discord送信ステータス (送信先末尾: ...{webhook_url[-6:]}, {i // chunk_size + 1}通目): {res.status_code}")
+    # 2つ目のWebhook: 絵文字付き
+    if WEBHOOK_URL_2:
+        payload = build_payload(stock_data, use_emoji=True)
+        res = requests.post(WEBHOOK_URL_2, json=payload)
+        print(f"Discord送信ステータス (Webhook 2, 絵文字付き): {res.status_code}")
 
 
 if __name__ == "__main__":
