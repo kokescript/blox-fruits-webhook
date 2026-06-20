@@ -87,17 +87,26 @@ def send_discord(stock_list):
 
 
 if __name__ == "__main__":
+    import re
     import requests as _requests
+
     _url = "https://fruityblox.com/stock"
     _headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     }
     _response = _requests.get(_url, headers=_headers, timeout=15)
-    print(f"ステータスコード: {_response.status_code}")
-    print(f"取得した長さ: {len(_response.text)} 文字")
-    print("===== 先頭2000文字 =====")
-    print(_response.text[:2000])
-    print("===== 'Rocket'という単語が含まれているか =====")
-    print("Rocket" in _response.text)
-    print("===== '__NEXT_DATA__'という単語が含まれているか =====")
-    print("__NEXT_DATA__" in _response.text)
+    _text = _response.text
+
+    print("===== preloadされている画像からフルーツ名を抽出 =====")
+    _preload_fruits = re.findall(r'/images/fruits/([a-z0-9\-]+)\.webp', _text)
+    print(_preload_fruits)
+
+    print("===== 'Normal' という単語の前後500文字 =====")
+    _idx = _text.find(">Normal<")
+    if _idx == -1:
+        _idx = _text.find("Normal")
+    print(_text[max(0, _idx-200):_idx+800])
+
+    print("===== href=\"/items/\" のリンク一覧 =====")
+    _item_links = re.findall(r'/items/([a-z0-9\-]+)', _text)
+    print(_item_links)
