@@ -1,0 +1,33 @@
+import os
+import requests
+import json
+
+# GitHubの設定画面から安全にウェブフックURLを読み込みます
+WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
+
+def get_blox_fruits_stock():
+    # ※ここは海外の無料API等からデータを引っ張る処理に書き換えることも可能です
+    # 今回はテストとして固定のリストを返します
+    return ["Kitsune (狐)", "Buddha (大仏)", "Chop (切断)"]
+
+def send_discord(stock_list):
+    if not WEBHOOK_URL:
+        print("エラー: ウェブフックURLが設定されていません")
+        return
+        
+    stock_text = "\n".join([f"• {fruit}" for fruit in stock_list])
+    
+    payload = {
+        "username": "ブロフル入荷Bot",
+        "embeds": [{
+            "title": "現在のフルーツディーラー在庫",
+            "description": f"【現在のラインナップ】\n\n{stock_text}\n\n※4時間ごとに自動更新中",
+            "color": 16753920
+        }]
+    }
+    
+    requests.post(WEBHOOK_URL, data=json.dumps(payload), headers={"Content-Type": "application/json"})
+
+if __name__ == "__main__":
+    fruits = get_blox_fruits_stock()
+    send_discord(fruits)
