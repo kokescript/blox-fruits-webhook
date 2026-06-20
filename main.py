@@ -7,11 +7,11 @@ WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
 
 def get_stock():
     try:
-        url = "https://blox-fruits.fandom.com/wiki/Blox_Fruits_Wiki"
+        # モバイル版のURLに変更してブロックを回避してみる
+        url = "https://m.blox-fruits.fandom.com/wiki/Blox_Fruits_Wiki"
 
-        # 完全にブラウザのふりをするためのUser-Agent
         headers = {
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+            "User-Agent": "Mozilla/5.0 (Linux; Android 10; K) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36"
         }
 
         response = requests.get(
