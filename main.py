@@ -148,6 +148,19 @@ FRUIT_EMOJIS = {
 }
 
 
+def reset_to_discord_timestamp(reset_str):
+    """'02:48:45' のような残り時間を、Discordの相対時刻表示 <t:...:R> に変換する"""
+    if not reset_str:
+        return None
+    try:
+        h, m, s = (int(x) for x in reset_str.split(":"))
+        remaining_seconds = h * 3600 + m * 60 + s
+        future_unix = int(datetime.now(timezone.utc).timestamp()) + remaining_seconds
+        return f"<t:{future_unix}:R>"
+    except (ValueError, AttributeError):
+        return None
+
+
 def fruit_display(fruit, use_emoji=False):
     """use_emoji=Trueなら絵文字付き、Falseならテキストのみで表示用文字列を作る"""
     price_text = f" - ${fruit['price']}" if fruit.get("price") else ""
@@ -165,10 +178,10 @@ def build_payload(stock_data, use_emoji=False):
     normal_text = "\n".join([fruit_display(f, use_emoji) for f in stock_data["normal"]]) or "（取得できませんでした）"
     mirage_text = "\n".join([fruit_display(f, use_emoji) for f in stock_data["mirage"]]) or "（取得できませんでした）"
 
-    normal_reset = stock_data.get("normal_reset")
-    mirage_reset = stock_data.get("mirage_reset")
-    normal_reset_line = f"次の入荷まで: {normal_reset}\n" if normal_reset else ""
-    mirage_reset_line = f"次の入荷まで: {mirage_reset}\n" if mirage_reset else ""
+    normal_reset_discord = reset_to_discord_timestamp(stock_data.get("normal_reset"))
+    mirage_reset_discord = reset_to_discord_timestamp(stock_data.get("mirage_reset"))
+    normal_reset_line = f"次の入荷: {normal_reset_discord}\n" if normal_reset_discord else ""
+    mirage_reset_line = f"次の入荷: {mirage_reset_discord}\n" if mirage_reset_discord else ""
 
     description = (
         "**ノーマルフルーツディーラー**" + "\n" + normal_reset_line + normal_text + "\n\n" +
