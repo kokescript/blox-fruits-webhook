@@ -174,5 +174,24 @@ def send_discord(stock_data):
 
 
 if __name__ == "__main__":
-    stock = get_stock()
-    send_discord(stock)
+    import re as _re
+    import requests as _requests
+
+    _url = "https://fruityblox.com/stock"
+    _headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    }
+    _response = _requests.get(_url, headers=_headers, timeout=15)
+    _html = _response.text
+
+    _normal_start = _html.find(">Normal<")
+    _mirage_start = _html.find(">Mirage<")
+    _normal_section = _html[_normal_start:_mirage_start]
+
+    print("===== Normalセクション 先頭3000文字（カード1〜2個分） =====")
+    print(_normal_section[:3000])
+
+    print()
+    print("===== 'Next reset' の前後200文字 =====")
+    _idx = _html.find("Next reset")
+    print(_html[max(0, _idx-50):_idx+250])
