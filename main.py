@@ -5,6 +5,7 @@ import requests
 from datetime import datetime, timezone
 
 WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
+WEBHOOK_URL_2 = os.environ.get("DISCORD_WEBHOOK_URL_2")
 
 # fruityblox.com はゲーム内ショップから自動でデータを取得しているため、
 # Wikiの手動更新よりも正確・リアルタイムに近い
@@ -41,12 +42,15 @@ def get_stock(max_retries=3, retry_delay=5):
             if not normal_slugs and not mirage_slugs:
                 raise ValueError("在庫アイテムが見つかりませんでした")
 
-            def to_names(slugs):
-                return [slug.replace("-", " ").title() for slug in slugs]
+            def to_fruit_list(slugs):
+                return [
+                    {"name": slug.replace("-", " ").title(), "slug": slug}
+                    for slug in slugs
+                ]
 
             return {
-                "normal": to_names(normal_slugs),
-                "mirage": to_names(mirage_slugs),
+                "normal": to_fruit_list(normal_slugs),
+                "mirage": to_fruit_list(mirage_slugs),
             }
 
         except (requests.exceptions.SSLError,
@@ -69,33 +73,68 @@ def get_stock(max_retries=3, retry_delay=5):
     return None
 
 
+FRUIT_IMAGE_BASE = "https://fruityblox.com/images/fruits/"
+
+
 def send_discord(stock_data):
-    if not WEBHOOK_URL:
+    # 設定されているWebhook URLをすべて集める（未設定のものは除く）
+    webhook_urls = [url for url in [WEBHOOK_URL, WEBHOOK_URL_2] if url]
+
+    if not webhook_urls:
         print("警告: DISCORD_WEBHOOK_URL が設定されていません。GitHubのSecretsを確認してください。")
         return
     if not stock_data or (not stock_data["normal"] and not stock_data["mirage"]):
         print("在庫取得失敗、または在庫が空です")
         return
 
-    normal_text = "\n".join([f"• {fruit}" for fruit in stock_data["normal"]]) or "（取得できませんでした）"
-    mirage_text = "\n".join([f"• {fruit}" for fruit in stock_data["mirage"]]) or "（取得できませんでした）"
-
     # Discordの相対時刻表示（例: "数秒前"）用のUnixタイムスタンプ
     now_unix = int(datetime.now(timezone.utc).timestamp())
     timestamp_text = f"<t:{now_unix}:R>"
 
-    description = "**ノーマルフルーツディーラー**" + "\n" + normal_text + "\n\n" + "**ミラージュフルーツディーラー**" + "\n" + mirage_text + "\n\n" + timestamp_text
+    embeds = []
 
-    payload = {
-        "username": "ブロフル入荷Bot",
-        "embeds": [{
-            "title": "🏪 フルーツディーラー在庫",
-            "description": description,
-            "color": 16753920
-        }]
-    }
-    res = requests.post(WEBHOOK_URL, json=payload)
-    print(f"Discord送信ステータス: {res.status_code}")
+    # 見出し用の最初の埋め込み（オレンジ色）
+    embeds.append({
+        "title": "🏪 フルーツディーラー在庫",
+        "description": "**ノーマルフルーツディーラー**" + "\n" + timestamp_text,
+        "color": 16753920
+    })
+
+    # ノーマル在庫: フルーツごとに画像付き埋め込み
+    for fruit in stock_data["normal"]:
+        embeds.append({
+            "description": "• " + fruit["name"],
+            "color": 16753920,
+            "thumbnail": {"url": FRUIT_IMAGE_BASE + fruit["slug"] + ".webp"}
+        })
+
+    # ミラージュ見出し
+    embeds.append({
+        "description": "**ミラージュフルーツディーラー**",
+        "color": 10181046
+    })
+
+    # ミラージュ在庫: フルーツごとに画像付き埋め込み
+    for fruit in stock_data["mirage"]:
+        embeds.append({
+            "description": "• " + fruit["name"],
+            "color": 10181046,
+            "thumbnail": {"url": FRUIT_IMAGE_BASE + fruit["slug"] + ".webp"}
+        })
+
+    # Discordは1メッセージにつきembed最大10個まで。超える場合は分割して送信する
+    chunk_size = 10
+
+    # 設定されている全てのWebhook URL（=全サーバー）に同じ内容を送る
+    for webhook_url in webhook_urls:
+        for i in range(0, len(embeds), chunk_size):
+            chunk = embeds[i:i + chunk_size]
+            payload = {
+                "username": "ブロフル入荷Bot",
+                "embeds": chunk
+            }
+            res = requests.post(webhook_url, json=payload)
+            print(f"Discord送信ステータス (送信先末尾: ...{webhook_url[-6:]}, {i // chunk_size + 1}通目): {res.status_code}")
 
 
 if __name__ == "__main__":
