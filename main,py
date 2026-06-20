@@ -1,29 +1,44 @@
 import os
 import requests
 import json
+from bs4 import BeautifulSoup
 
-# GitHubの設定からDiscordのURLを読み込む
 WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
 
-def get_blox_fruits_stock():
+def get_real_blox_fruits_stock():
     try:
-        # 【修正】正しいAPIのURLに書き換えました
-        response = requests.get("https://bloxfruits.xyz", timeout=5)
+        # ブロフル公式Wikiのストックページからデータを取得
+        url = "https://fandom.com"
+        headers = {"User-Agent": "Mozilla/5.0"}
+        response = requests.get(url, headers=headers, timeout=10)
+        
         if response.status_code == 200:
-            data = response.json()
-            # APIから現在のショップの果物名リストを抽出
-            fruits = [fruit['name'] for fruit in data.get('current', [])]
+            soup = BeautifulSoup(response.text, 'html.parser')
+            
+            # Wikiのページ内から「Current Stock（現在の在庫）」のテーブルを探す
+            # ページ構造から果物の名前が入っている要素を抽出します
+            fruits = []
+            # 現在のストックが表示されているテーブルの枠を探す（一般的なFandomの構成）
+            stock_table = soup.find('table', {'class': 'article-table'})
+            if stock_table:
+                rows = stock_table.find_all('tr')
+                for row in rows[1:]: # 見出しを飛ばす
+                    cols = row.find_all('td')
+                    if cols:
+                        fruit_name = cols[0].text.strip()
+                        fruits.append(fruit_name)
+            
             if fruits:
                 return fruits
+                
     except Exception as e:
-        print(f"APIエラー: {e}")
-    
-    # APIからデータが取れなかった場合のバックアップ
-    return ["現在ショップ情報を読み込み中です。しばらくお待ちください。"]
+        print(f"Wikiからのデータ取得に失敗しました: {e}")
+        
+    return ["データの自動取得に失敗しました。Wikiのページ構成が変わった可能性があります。"]
 
 def send_discord(stock_list):
     if not WEBHOOK_URL:
-        print("エラー: DiscordのウェブフックURLが設定されていません")
+        print("エラー: DiscordのウェブフックURLが未設定です")
         return
         
     stock_text = "\n".join([f"• {fruit}" for fruit in stock_list])
@@ -31,19 +46,14 @@ def send_discord(stock_list):
     payload = {
         "username": "ブロフル入荷Bot",
         "embeds": [{
-            "title": "🏪 現在のフルーツディーラー在庫",
-            "description": f"【現在のラインナップ】\n\n{stock_text}\n\n※4時間ごとに自動更新中",
+            "title": "🏪 現在のフルーツディーラーリアルタイム在庫",
+            "description": f"【現在の公式ラインナップ】\n\n{stock_text}\n\n※4時間ごとにWikiから最新情報を自動取得中",
             "color": 16753920
         }]
     }
     
-    # Discordへデータを送信
-    res = requests.post(WEBHOOK_URL, data=json.dumps(payload), headers={"Content-Type": "application/json"})
-    if res.status_code == 204:
-        print("Discordへの通知に成功しました！")
-    else:
-        print(f"Discord送信失敗: {res.status_code}")
+    requests.post(WEBHOOK_URL, data=json.dumps(payload), headers={"Content-Type": "application/json"})
 
 if __name__ == "__main__":
-    fruits = get_blox_fruits_stock()
+    fruits = get_real_blox_fruits_stock()
     send_discord(fruits)
