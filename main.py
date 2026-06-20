@@ -40,7 +40,11 @@ def get_stock(max_retries=3, retry_delay=5):
 
             page_text = data.get("parse", {}).get("wikitext", {}).get("*", "")
             if not page_text:
+                print(f"デバッグ: APIレスポンス全体 = {data}")
                 raise ValueError("APIレスポンスにwikitextが含まれていません")
+
+            print(f"デバッグ: 取得したwikitextの長さ = {len(page_text)} 文字")
+            print(f"デバッグ: 先頭500文字 = {page_text[:500]}")
 
             fruits = [fruit for fruit in FRUIT_NAMES if fruit in page_text]
             return fruits
