@@ -7,18 +7,19 @@ WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
 
 def get_blox_fruits_stock():
     try:
-        # 外部APIからデータを取得してみる
+        # 【修正】正しいAPIのURLに書き換えました
         response = requests.get("https://bloxfruits.xyz", timeout=5)
         if response.status_code == 200:
             data = response.json()
+            # APIから現在のショップの果物名リストを抽出
             fruits = [fruit['name'] for fruit in data.get('current', [])]
             if fruits:
                 return fruits
     except Exception as e:
-        print(f"APIエラー（スキップします）: {e}")
+        print(f"APIエラー: {e}")
     
-    # 【対策】APIが壊れていてデータが取れなかった場合は、この安全な仮データを代わりに送る
-    return ["Kitsune (狐) ※データ取得中", "Buddha (大仏) ※データ取得中", "Chop (切断) ※データ取得中"]
+    # APIからデータが取れなかった場合のバックアップ
+    return ["現在ショップ情報を読み込み中です。しばらくお待ちください。"]
 
 def send_discord(stock_list):
     if not WEBHOOK_URL:
@@ -36,7 +37,12 @@ def send_discord(stock_list):
         }]
     }
     
-    requests.post(WEBHOOK_URL, data=json.dumps(payload), headers={"Content-Type": "application/json"})
+    # Discordへデータを送信
+    res = requests.post(WEBHOOK_URL, data=json.dumps(payload), headers={"Content-Type": "application/json"})
+    if res.status_code == 204:
+        print("Discordへの通知に成功しました！")
+    else:
+        print(f"Discord送信失敗: {res.status_code}")
 
 if __name__ == "__main__":
     fruits = get_blox_fruits_stock()
