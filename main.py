@@ -87,5 +87,17 @@ def send_discord(stock_list):
 
 
 if __name__ == "__main__":
-    stock = get_stock()
-    send_discord(stock)
+    import requests as _requests
+    _url = "https://fruityblox.com/stock"
+    _headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+    }
+    _response = _requests.get(_url, headers=_headers, timeout=15)
+    print(f"ステータスコード: {_response.status_code}")
+    print(f"取得した長さ: {len(_response.text)} 文字")
+    print("===== 先頭2000文字 =====")
+    print(_response.text[:2000])
+    print("===== 'Rocket'という単語が含まれているか =====")
+    print("Rocket" in _response.text)
+    print("===== '__NEXT_DATA__'という単語が含まれているか =====")
+    print("__NEXT_DATA__" in _response.text)
