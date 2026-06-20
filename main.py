@@ -84,6 +84,20 @@ def send_discord(stock_data):
     now_unix = int(datetime.now(timezone.utc).timestamp())
     timestamp_text = f"<t:{now_unix}:R>"
 
-    description = (
-        f"**ノーマルフルーツディーラー**\n{normal_text}\n\n"
-        f"**ミラージュフルーツディーラー**\n
+    description = "**ノーマルフルーツディーラー**" + "\n" + normal_text + "\n\n" + "**ミラージュフルーツディーラー**" + "\n" + mirage_text + "\n\n" + timestamp_text
+
+    payload = {
+        "username": "ブロフル入荷Bot",
+        "embeds": [{
+            "title": "🏪 フルーツディーラー在庫",
+            "description": description,
+            "color": 16753920
+        }]
+    }
+    res = requests.post(WEBHOOK_URL, json=payload)
+    print(f"Discord送信ステータス: {res.status_code}")
+
+
+if __name__ == "__main__":
+    stock = get_stock()
+    send_discord(stock)
