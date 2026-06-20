@@ -13,11 +13,24 @@ STOCK_URL = "https://fruityblox.com/stock"
 
 
 def get_stock(max_retries=3, retry_delay=5):
-    """Normal在庫とMirage在庫の両方を取得して辞書で返す"""
+    """Normal在庫とMirage在庫（フルーツ名・価格）、それぞれの次回更新までの時間を取得して辞書で返す"""
     session = requests.Session()
     session.headers.update({
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     })
+
+    # 1枚のフルーツカード: href="/items/スラッグ" ... <h3>名前</h3> ... $価格</span>
+    CARD_PATTERN = re.compile(
+        r'href="/items/([a-z0-9\-]+)"'
+        r'.*?<h3[^>]*>([^<]+)</h3>'
+        r'.*?w-3 h-3"[^>]*></svg>([\d,]+)</span>',
+        re.DOTALL
+    )
+    # "Next reset" の直後にある "12<!-- -->:<!-- -->34<!-- -->:<!-- -->56" 形式のカウントダウン
+    RESET_PATTERN = re.compile(
+        r'Next reset.*?aria-live="off">(\d+)<!-- -->:<!-- -->(\d+)<!-- -->:<!-- -->(\d+)',
+        re.DOTALL
+    )
 
     last_error = None
     for attempt in range(1, max_retries + 1):
@@ -31,26 +44,32 @@ def get_stock(max_retries=3, retry_delay=5):
             if normal_start == -1 or mirage_start == -1:
                 raise ValueError("NormalまたはMirageのセクションが見つかりませんでした")
 
-            # Normalセクション: "Normal"の見出しから"Mirage"の見出しまで
             normal_section = html[normal_start:mirage_start]
-            # Mirageセクション: "Mirage"の見出しから先(ページ末尾近くまで)
-            mirage_section = html[mirage_start:mirage_start + 5000]
+            mirage_section = html[mirage_start:mirage_start + 8000]
 
-            normal_slugs = re.findall(r'/items/([a-z0-9\-]+)', normal_section)
-            mirage_slugs = re.findall(r'/items/([a-z0-9\-]+)', mirage_section)
+            def parse_section(section):
+                fruits = []
+                for slug, name, price in CARD_PATTERN.findall(section):
+                    fruits.append({
+                        "slug": slug,
+                        "name": name.strip().title(),
+                        "price": price,
+                    })
+                reset_match = RESET_PATTERN.search(section)
+                reset_time = f"{reset_match.group(1)}:{reset_match.group(2)}:{reset_match.group(3)}" if reset_match else None
+                return fruits, reset_time
 
-            if not normal_slugs and not mirage_slugs:
+            normal_fruits, normal_reset = parse_section(normal_section)
+            mirage_fruits, mirage_reset = parse_section(mirage_section)
+
+            if not normal_fruits and not mirage_fruits:
                 raise ValueError("在庫アイテムが見つかりませんでした")
 
-            def to_fruit_list(slugs):
-                return [
-                    {"name": slug.replace("-", " ").title(), "slug": slug}
-                    for slug in slugs
-                ]
-
             return {
-                "normal": to_fruit_list(normal_slugs),
-                "mirage": to_fruit_list(mirage_slugs),
+                "normal": normal_fruits,
+                "mirage": mirage_fruits,
+                "normal_reset": normal_reset,
+                "mirage_reset": mirage_reset,
             }
 
         except (requests.exceptions.SSLError,
@@ -122,11 +141,12 @@ FRUIT_EMOJIS = {
 
 def fruit_display(fruit, use_emoji=False):
     """use_emoji=Trueなら絵文字付き、Falseならテキストのみで表示用文字列を作る"""
+    price_text = f" - ${fruit['price']}" if fruit.get("price") else ""
     if use_emoji:
         emoji = FRUIT_EMOJIS.get(fruit["slug"], "")
         if emoji:
-            return f"{emoji} {fruit['name']}"
-    return f"• {fruit['name']}"
+            return f"{emoji} {fruit['name']}{price_text}"
+    return f"• {fruit['name']}{price_text}"
 
 
 def build_payload(stock_data, use_emoji=False):
@@ -136,9 +156,14 @@ def build_payload(stock_data, use_emoji=False):
     normal_text = "\n".join([fruit_display(f, use_emoji) for f in stock_data["normal"]]) or "（取得できませんでした）"
     mirage_text = "\n".join([fruit_display(f, use_emoji) for f in stock_data["mirage"]]) or "（取得できませんでした）"
 
+    normal_reset = stock_data.get("normal_reset")
+    mirage_reset = stock_data.get("mirage_reset")
+    normal_reset_line = f"次の入荷まで: {normal_reset}\n" if normal_reset else ""
+    mirage_reset_line = f"次の入荷まで: {mirage_reset}\n" if mirage_reset else ""
+
     description = (
-        "**ノーマルフルーツディーラー**" + "\n" + normal_text + "\n\n" +
-        "**ミラージュフルーツディーラー**" + "\n" + mirage_text + "\n\n" +
+        "**ノーマルフルーツディーラー**" + "\n" + normal_reset_line + normal_text + "\n\n" +
+        "**ミラージュフルーツディーラー**" + "\n" + mirage_reset_line + mirage_text + "\n\n" +
         timestamp_text
     )
 
@@ -174,24 +199,5 @@ def send_discord(stock_data):
 
 
 if __name__ == "__main__":
-    import re as _re
-    import requests as _requests
-
-    _url = "https://fruityblox.com/stock"
-    _headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    }
-    _response = _requests.get(_url, headers=_headers, timeout=15)
-    _html = _response.text
-
-    _normal_start = _html.find(">Normal<")
-    _mirage_start = _html.find(">Mirage<")
-    _normal_section = _html[_normal_start:_mirage_start]
-
-    print("===== Normalセクション 先頭3000文字（カード1〜2個分） =====")
-    print(_normal_section[:3000])
-
-    print()
-    print("===== 'Next reset' の前後200文字 =====")
-    _idx = _html.find("Next reset")
-    print(_html[max(0, _idx-50):_idx+250])
+    stock = get_stock()
+    send_discord(stock)
