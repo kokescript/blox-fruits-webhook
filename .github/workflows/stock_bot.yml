@@ -1,29 +1,27 @@
-name: BloxFruits Stock Bot
+name: Blox Fruits Stock Check
 
 on:
-  workflow_dispatch:
   schedule:
-    - cron: '0 */4 * * *'
+    - cron: "0 */4 * * *"  # 4時間ごとに実行（0時、4時、8時、12時、16時、20時 UTC）
+  workflow_dispatch:  # 手動実行ボタンも使えるようにする
 
 jobs:
-  run-bot:
+  check-stock:
     runs-on: ubuntu-latest
     steps:
-    - name: checkout
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.10'
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
 
-    - name: library
-      run: pip install requests beautifulsoup4
+      - name: Install dependencies
+        run: |
+          pip install requests beautifulsoup4 cloudscraper
 
-    - name: run
-      env:
-        DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-      run: |
-        ls -la
-        find . -name "*.py"
-        python ./main.py
+      - name: Run script
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: python main.py
