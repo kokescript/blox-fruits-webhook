@@ -20,11 +20,10 @@ jobs:
     - name: library
       run: pip install requests beautifulsoup4
 
-
-- name: run
-  env:
-    DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
-  run: |
-    ls -la
-    find . -name "*.py"
-    python ./main.py
+    - name: run
+      env:
+        DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+      run: |
+        ls -la
+        find . -name "*.py"
+        python ./main.py
