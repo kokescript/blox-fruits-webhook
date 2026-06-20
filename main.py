@@ -26,7 +26,7 @@ def get_stock(max_retries=3, retry_delay=5):
 
     params = {
         "action": "parse",
-        "page": "Blox_Fruits_Wiki",
+        "page": "Template:CurrentStock",
         "format": "json",
         "prop": "wikitext",
     }
