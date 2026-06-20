@@ -1,4 +1,5 @@
 import os
+import re
 import time
 import requests
 
@@ -7,14 +8,6 @@ WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
 # HTMLスクレイピングではなく、MediaWikiの公式APIを直接叩く方式に変更
 # (HTMLページはCloudflareのbot対策でブロックされやすいが、api.phpは比較的安定している)
 API_URL = "https://blox-fruits.fandom.com/api.php"
-
-FRUIT_NAMES = [
-    "Rocket", "Spin", "Chop", "Spring", "Bomb", "Smoke", "Spike", "Flame",
-    "Falcon", "Ice", "Sand", "Dark", "Diamond", "Light", "Rubber", "Ghost",
-    "Magma", "Quake", "Buddha", "Love", "Spider", "Sound", "Phoenix", "Portal",
-    "Rumble", "Pain", "Blizzard", "Gravity", "Mammoth", "T-Rex", "Dough",
-    "Shadow", "Venom", "Control", "Spirit", "Dragon", "Leopard", "Kitsune"
-]
 
 
 def get_stock(max_retries=3, retry_delay=5):
@@ -40,13 +33,15 @@ def get_stock(max_retries=3, retry_delay=5):
 
             page_text = data.get("parse", {}).get("wikitext", {}).get("*", "")
             if not page_text:
-                print(f"デバッグ: APIレスポンス全体 = {data}")
                 raise ValueError("APIレスポンスにwikitextが含まれていません")
 
-            print(f"デバッグ: 取得したwikitextの長さ = {len(page_text)} 文字")
-            print(f"デバッグ: 先頭1500文字 = {page_text[:1500]}")
+            # "|Current = Flame, Sand, Love" のような行だけを取り出す
+            match = re.search(r"\|\s*Current\s*=\s*(.+)", page_text)
+            if not match:
+                raise ValueError("Current在庫の行が見つかりませんでした")
 
-            fruits = [fruit for fruit in FRUIT_NAMES if fruit in page_text]
+            current_line = match.group(1).strip()
+            fruits = [f.strip() for f in current_line.split(",") if f.strip()]
             return fruits
 
         except (requests.exceptions.SSLError,
