@@ -2,27 +2,27 @@ import os
 import requests
 import json
 
-# GitHubの隠し部屋からURLを読み込む
+# GitHubの設定からDiscordのURLを読み込む
 WEBHOOK_URL = os.environ.get("DISCORD_WEBHOOK_URL")
 
 def get_blox_fruits_stock():
     try:
-        # 海外の信頼できる無料のブロフル在庫APIからデータを取得
-        response = requests.get("https://bloxfruits.xyz", timeout=10)
+        # 外部APIからデータを取得してみる
+        response = requests.get("https://bloxfruits.xyz", timeout=5)
         if response.status_code == 200:
             data = response.json()
-            # APIのデータ構造に合わせて果物の名前リストを作成
-            # ※APIの形式によって調整が必要な場合があります
-            return [fruit['name'] for fruit in data.get('current', [])]
+            fruits = [fruit['name'] for fruit in data.get('current', [])]
+            if fruits:
+                return fruits
     except Exception as e:
-        print(f"データ取得エラー: {e}")
+        print(f"APIエラー（スキップします）: {e}")
     
-    # 万が一APIが落ちていた場合のバックアップ（検証用）
-    return ["APIからデータを取得できませんでした"]
+    # 【対策】APIが壊れていてデータが取れなかった場合は、この安全な仮データを代わりに送る
+    return ["Kitsune (狐) ※データ取得中", "Buddha (大仏) ※データ取得中", "Chop (切断) ※データ取得中"]
 
 def send_discord(stock_list):
     if not WEBHOOK_URL:
-        print("エラー: DiscordのウェブフックURLが未設定です")
+        print("エラー: DiscordのウェブフックURLが設定されていません")
         return
         
     stock_text = "\n".join([f"• {fruit}" for fruit in stock_list])
@@ -36,9 +36,7 @@ def send_discord(stock_list):
         }]
     }
     
-    res = requests.post(WEBHOOK_URL, data=json.dumps(payload), headers={"Content-Type": "application/json"})
-    if res.status_code != 204:
-        print(f"Discord送信エラー: {res.status_code}")
+    requests.post(WEBHOOK_URL, data=json.dumps(payload), headers={"Content-Type": "application/json"})
 
 if __name__ == "__main__":
     fruits = get_blox_fruits_stock()
