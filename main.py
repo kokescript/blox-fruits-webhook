@@ -26,7 +26,7 @@ def get_stock(max_retries=3, retry_delay=5):
 
     params = {
         "action": "parse",
-        "page": "Template:CurrentStock",
+        "page": 'Blox Fruits "Stock"',
         "format": "json",
         "prop": "wikitext",
     }
@@ -44,7 +44,7 @@ def get_stock(max_retries=3, retry_delay=5):
                 raise ValueError("APIレスポンスにwikitextが含まれていません")
 
             print(f"デバッグ: 取得したwikitextの長さ = {len(page_text)} 文字")
-            print(f"デバッグ: 先頭500文字 = {page_text[:500]}")
+            print(f"デバッグ: 先頭1500文字 = {page_text[:1500]}")
 
             fruits = [fruit for fruit in FRUIT_NAMES if fruit in page_text]
             return fruits
