@@ -2,8 +2,8 @@ name: Blox Fruits Stock Check
 
 on:
   schedule:
-    - cron: "0 */4 * * *"  # 4時間ごとに実行（0時、4時、8時、12時、16時、20時 UTC）
-  workflow_dispatch:  # 手動実行ボタンも使えるようにする
+    - cron: "0 */4 * * *"  # 4時間ごとに実行
+  workflow_dispatch:
 
 jobs:
   check-stock:
@@ -19,7 +19,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install requests beautifulsoup4 cloudscraper
+          pip install requests
 
       - name: Run script
         env:
