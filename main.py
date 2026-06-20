@@ -19,11 +19,11 @@ def get_stock(max_retries=3, retry_delay=5):
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
     })
 
-    # 1枚のフルーツカード: href="/items/スラッグ" ... <h3>名前</h3> ... $価格</span>
+    # 1枚のフルーツカード: href="/items/スラッグ" ... <h3>名前</h3> ... 緑色の$価格を含むspan
     CARD_PATTERN = re.compile(
         r'href="/items/([a-z0-9\-]+)"'
         r'.*?<h3[^>]*>([^<]+)</h3>'
-        r'.*?w-3 h-3"[^>]*></svg>([\d,]+)</span>',
+        r'.*?text-green-400[^>]*>.*?</svg>([\d,]+)</span>',
         re.DOTALL
     )
     # "Next reset" の直後にある "12<!-- -->:<!-- -->34<!-- -->:<!-- -->56" 形式のカウントダウン
@@ -49,12 +49,21 @@ def get_stock(max_retries=3, retry_delay=5):
 
             def parse_section(section):
                 fruits = []
-                for slug, name, price in CARD_PATTERN.findall(section):
-                    fruits.append({
-                        "slug": slug,
-                        "name": name.strip().title(),
-                        "price": price,
-                    })
+                matches = CARD_PATTERN.findall(section)
+                if matches:
+                    for slug, name, price in matches:
+                        fruits.append({
+                            "slug": slug,
+                            "name": name.strip().title(),
+                            "price": price,
+                        })
+                else:
+                    # 価格付きパターンが取れなかった場合、フルーツ名だけでも取得する
+                    slugs = re.findall(r'/items/([a-z0-9\-]+)', section)
+                    fruits = [
+                        {"slug": slug, "name": slug.replace("-", " ").title(), "price": None}
+                        for slug in slugs
+                    ]
                 reset_match = RESET_PATTERN.search(section)
                 reset_time = f"{reset_match.group(1)}:{reset_match.group(2)}:{reset_match.group(3)}" if reset_match else None
                 return fruits, reset_time
@@ -168,7 +177,7 @@ def build_payload(stock_data, use_emoji=False):
     )
 
     return {
-        "username": "ブロフル入荷Bot",
+        "username": "Blox Fruits Stock",
         "embeds": [{
             "title": "🏪 フルーツディーラー在庫",
             "description": description,
